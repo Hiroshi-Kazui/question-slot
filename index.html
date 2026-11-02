@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>質問スロット</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=M+PLUS+1:wght@400;600&display=swap">
+<style>
+/* Layout: one column — slot window as hero, question card under it, number board + file loader below */
+:root{
+  --bg:#EDF0F5; --surface:#FFFFFF; --ink:#1C2740; --muted:#5E6A82;
+  --accent:#D99A00; --accent-ink:#1C2740; --line:#D3D9E4; --used:#C9CFDA;
+  --reel:#1C2740; --reel-fg:#FFD25A;
+  --display:"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif;
+  --body:"M PLUS 1","Hiragino Sans","Noto Sans JP",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121827; --surface:#1B2336; --ink:#E8ECF4; --muted:#9AA5BC;
+  --accent:#F0B429; --accent-ink:#121827; --line:#2C3650; --used:#2A3248;
+  --reel:#0B101C; --reel-fg:#FFD25A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121827; --surface:#1B2336; --ink:#E8ECF4; --muted:#9AA5BC;
+  --accent:#F0B429; --accent-ink:#121827; --line:#2C3650; --used:#2A3248;
+  --reel:#0B101C; --reel-fg:#FFD25A; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+h1{font-family:var(--display);font-weight:900;font-size:1.9rem;margin:0;letter-spacing:.02em}
+.count{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.95rem}
+.count b{color:var(--ink);font-size:1.2rem}
+.slot{background:var(--reel);border-radius:20px;padding:28px 16px;display:flex;flex-direction:column;align-items:center;gap:20px}
+.machine{position:relative;width:min(240px,100%);padding:10px;border-radius:18px;background:linear-gradient(#3A4766,#141C2E);box-shadow:inset 0 2px 0 #fff3,0 8px 20px #0006}
+.window{--row:86px;height:calc(var(--row)*3);border-radius:10px;overflow:hidden;position:relative;
+  background:linear-gradient(#cfd5df,#fff 30%,#fff 70%,#cfd5df)}
+.window::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:linear-gradient(#000a,transparent 30%,transparent 70%,#000a)}
+.payline{position:absolute;left:-14px;right:-14px;top:50%;height:var(--row);transform:translateY(-50%);z-index:3;pointer-events:none;
+  border-top:3px solid var(--reel-fg);border-bottom:3px solid var(--reel-fg)}
+.payline::before,.payline::after{content:"";position:absolute;top:50%;transform:translateY(-50%);border:10px solid transparent}
+.payline::before{left:0;border-left-color:var(--reel-fg)}
+.payline::after{right:0;border-right-color:var(--reel-fg)}
+.strip{will-change:transform}
+.strip.fast{filter:blur(2px)}
+.strip div{height:var(--row);display:grid;place-items:center;font-family:var(--display);font-weight:900;font-size:4.2rem;
+  color:#1C2740;font-variant-numeric:tabular-nums;line-height:1}
+.strip div.hit{color:#C0392B;animation:pop .5s ease-out}
+@keyframes pop{0%{transform:scale(1.4)}60%{transform:scale(.92)}100%{transform:scale(1)}}
+.machine.win{animation:flash .9s ease-out}
+@keyframes flash{0%,40%,80%{box-shadow:inset 0 2px 0 #fff3,0 0 0 4px var(--reel-fg),0 0 30px var(--reel-fg)}20%,60%,100%{box-shadow:inset 0 2px 0 #fff3,0 8px 20px #0006}}
+button{font-family:var(--display);font-weight:700;cursor:pointer;border-radius:999px;border:0}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+#spinBtn{background:var(--accent);color:var(--accent-ink);font-size:1.25rem;padding:14px 48px;box-shadow:0 4px 0 #0005}
+#spinBtn:active{transform:translateY(2px);box-shadow:0 2px 0 #0005}
+#spinBtn:disabled{opacity:.45;cursor:default}
+.question{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 20px;min-height:110px}
+.question .label{font-size:.8rem;letter-spacing:.12em;color:var(--muted)}
+.question p{font-family:var(--display);font-weight:700;font-size:1.45rem;line-height:1.6;margin:6px 0 0;text-wrap:balance;overflow-wrap:anywhere}
+.question p.empty{font-weight:500;font-size:1rem;color:var(--muted)}
+h2{font-family:var(--display);font-size:1.05rem;margin:0 0 10px}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px}
+.cell{font-variant-numeric:tabular-nums;text-align:center;padding:8px 0;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:.95rem}
+.cell.used{background:var(--used);color:var(--muted);text-decoration:line-through;border-color:transparent;cursor:pointer}
+.cell.last{background:var(--accent);color:var(--accent-ink);text-decoration:none}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);padding:9px 18px;font-size:.92rem}
+.file{position:relative;overflow:hidden}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.note{font-size:.85rem;color:var(--muted);margin:0}
+.note code{background:var(--surface);border:1px solid var(--line);padding:1px 6px;border-radius:5px}
+.msg{font-size:.9rem;margin:0}
+.msg.err{color:#C0392B}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.danger{background:#C0392B;color:#fff;padding:9px 18px;font-size:.92rem}
+.src{font-size:.8rem;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.strip div.hit,.machine.win{animation:none}}
+.view{display:flex;flex-direction:column;gap:20px}
+.question{min-height:140px}
+.bigfile{display:block;text-align:center;background:var(--accent);color:var(--accent-ink);font-family:var(--display);font-weight:700;font-size:1.15rem;padding:16px;border-radius:14px;cursor:pointer}
+.bigfile:focus-within{outline:3px solid var(--ink);outline-offset:3px}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs a{text-align:center;padding:14px 4px;color:var(--muted);text-decoration:none;font-family:var(--display);font-weight:700;font-size:.95rem;border-top:3px solid transparent}
+.tabs a.on{color:var(--ink);border-top-color:var(--accent)}
+.tabs a:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+body{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <!-- 画面1：スロット -->
+  <main class="view" id="view-slot">
+    <header>
+      <h1>質問スロット</h1>
+      <div class="count">残り <b id="remain">0</b> / <span id="total">0</span></div>
+    </header>
+    <section class="slot" aria-label="スロット">
+      <div class="machine" id="machine">
+        <div class="window" id="win"><div class="strip" id="strip"></div></div>
+        <div class="payline"></div>
+      </div>
+      <button id="spinBtn" type="button">スタート</button>
+    </section>
+    <section class="question" aria-live="polite">
+      <div class="label" id="qLabel">質問</div>
+      <p id="qText" class="empty">「スタート」を押すと、出た番号の質問がここに表示されます。</p>
+    </section>
+  </main>
+
+  <!-- 画面2：出た番号 -->
+  <main class="view" id="view-board" hidden>
+    <header><h1>出た番号</h1></header>
+    <p class="note">灰色が出た番号です。タップすると、その質問を見られます。</p>
+    <div class="board" id="board"></div>
+    <section class="question" id="boardQ" hidden>
+      <div class="label" id="bLabel"></div>
+      <p id="bText"></p>
+    </section>
+    <div><span id="resetArea"><button id="resetBtn" class="ghost" type="button">最初からやり直す</button></span></div>
+  </main>
+
+  <!-- 画面3：質問ファイル -->
+  <main class="view" id="view-file" hidden>
+    <header><h1>質問ファイル</h1></header>
+    <section class="question">
+      <div class="label">読み込み中のファイル</div>
+      <p class="src" id="srcName" style="font-size:1rem;color:var(--ink)">交わり質問（10問）</p>
+    </section>
+    <label class="bigfile file">
+      CSV / Excel を選ぶ
+      <input id="fileIn" type="file" accept=".csv,.xlsx,.xls,text/csv">
+    </label>
+    <p class="msg" id="msg"></p>
+    <p class="note">形式：A列＝番号、B列＝質問内容。1行目が見出し（例 <code>番号,質問</code>）でも構いません。Excelは最初のシートを読みます。読み込むと、出た番号はリセットされます。</p>
+  </main>
+</div>
+
+<nav class="tabs" aria-label="画面切り替え">
+  <a href="#slot" data-v="slot">スロット</a>
+  <a href="#board" data-v="board">出た番号</a>
+  <a href="#file" data-v="file">質問ファイル</a>
+</nav>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const KEY="question-slot-v2";
+  let questions={}; // {num: text}
+  let used=[];      // order drawn
+  let source="交わり質問（10問）";
+  let spinning=false;
+
+  function sample(){
+    const q={};
+    ["復活してきた聖書中の人物の1人と聖書レッスンができます。誰がいい？その理由は？",
+     "楽園でペットにしたい動物は？",
+     "楽園で最初に住んでみたい場所はどこ？",
+     "聖書中の人物と1日一緒に過ごせるなら、誰と何をしたい？",
+     "楽園で身につけたい技術や仕事は？",
+     "復活してきた人に、最初に教えてあげたいことは？",
+     "聖書の中で一番好きな場面は？その理由は？",
+     "楽園で一緒に食卓を囲みたい聖書中の人物は？何を出す？",
+     "聖書中の人物に1つだけ質問できるなら、誰に何を聞く？",
+     "これまでの奉仕で心に残っている経験は？"].forEach((t,i)=>q[i+1]=t);
+    return q;
+  }
+  function save(){try{localStorage.setItem(KEY,JSON.stringify({questions,used,source}))}catch(e){}}
+  function load(){
+    try{const d=JSON.parse(localStorage.getItem(KEY)||"null");
+      if(d&&d.questions&&Object.keys(d.questions).length){questions=d.questions;used=d.used||[];source=d.source||source;return}
+    }catch(e){}
+    questions=sample();used=[];
+  }
+  const nums=()=>Object.keys(questions).map(Number).sort((a,b)=>a-b);
+  const remaining=()=>nums().filter(n=>!used.includes(n));
+
+  function render(){
+    const all=nums(), rem=remaining();
+    $("remain").textContent=rem.length; $("total").textContent=all.length;
+    $("srcName").textContent=source;
+    const last=used[used.length-1];
+    $("board").innerHTML=all.map(n=>{
+      const u=used.includes(n);
+      return `<div class="cell${u?" used":""}${n===last?" last":""}" data-n="${n}"${u?' role="button" tabindex="0"':""}>${n}</div>`;
+    }).join("");
+    $("spinBtn").disabled=mode!=="idle"||rem.length===0;
+    $("spinBtn").textContent=rem.length===0?"全部出ました":"スタート";
+  }
+  function show(n){
+    $("qLabel").textContent="No. "+n;
+    const p=$("qText"); p.classList.remove("empty"); p.textContent=questions[n]||"（質問が空です）";
+  }
+
+  /* ---- リール ---- */
+  const strip=$("strip");
+  let seq=[], y=0, mode="idle", raf=0, lastT=0;
+  const SPEED=1900; // px/秒
+  const rowH=()=>$("win").clientHeight/3;
+  function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+  function buildStrip(list,centerNum){
+    seq=list.length?shuffle(list):["?"];
+    if(centerNum!=null){const k=seq.indexOf(centerNum);if(k<0)seq.unshift(centerNum)}
+    strip.innerHTML=[0,1,2].map(()=>seq.map(n=>`<div>${n}</div>`).join("")).join("");
+    const k=centerNum!=null?seq.indexOf(centerNum):1;
+    y=((k-1+seq.length)%seq.length)*rowH(); draw();
+  }
+  function draw(){
+    const L=seq.length*rowH(); const p=((y%L)+L)%L;
+    strip.style.transform=`translateY(${-(p+L)}px)`;
+  }
+  function loop(t){
+    const dt=Math.min(.05,(t-lastT)/1000); lastT=t;
+    y+=SPEED*dt; draw();
+    if(mode==="spinning") raf=requestAnimationFrame(loop);
+  }
+  function start(){
+    const rem=remaining(); if(mode!=="idle"||!rem.length) return;
+    strip.querySelectorAll(".hit").forEach(e=>e.classList.remove("hit"));
+    buildStrip(rem);
+    mode="spinning"; spinning=true; strip.classList.add("fast");
+    $("qLabel").textContent="質問"; const p=$("qText"); p.classList.add("empty"); p.textContent="……";
+    $("spinBtn").textContent="ストップ"; $("spinBtn").disabled=true;
+    setTimeout(()=>{ if(mode==="spinning") $("spinBtn").disabled=false; },500);
+    lastT=performance.now(); raf=requestAnimationFrame(loop);
+  }
+  function stop(){
+    if(mode!=="spinning") return;
+    mode="stopping"; cancelAnimationFrame(raf); $("spinBtn").disabled=true;
+    const target=seq[Math.floor(Math.random()*seq.length)];
+    const k=seq.indexOf(target), L=seq.length, h=rowH();
+    const cur=y/h, minRows=cur+6;
+    let r=Math.ceil(minRows); while(((r+1)%L+L)%L!==k) r++;  // 中央の行に target が来る位置
+    const y0=y, d=r*h-y0, T=Math.max(.6,3*d/SPEED)*1000, t0=performance.now();
+    (function ease(t){
+      const s=Math.min(1,(t-t0)/T); y=y0+d*(1-Math.pow(1-s,3)); draw();
+      if(s<.55) strip.classList.add("fast"); else strip.classList.remove("fast");
+      if(s<1){raf=requestAnimationFrame(ease);return}
+      // 停止
+      const idx=L+((r+1)%L); const cell=strip.children[idx]; if(cell){cell.classList.add("hit")}
+      const m=$("machine"); m.classList.remove("win"); void m.offsetWidth; m.classList.add("win");
+      used.push(target); mode="idle"; spinning=false; save(); render(); show(target);
+    })(performance.now());
+  }
+  function spin(){ if(mode==="idle") start(); else if(mode==="spinning") stop(); }
+
+  function parseRows(rows){
+    const q={};
+    rows.forEach(r=>{
+      if(!r||r.length<2) return;
+      const n=parseInt(String(r[0]).trim(),10);
+      const t=String(r[1]??"").trim();
+      if(Number.isInteger(n)&&n>0&&t) q[n]=t;
+    });
+    return q;
+  }
+  $("fileIn").addEventListener("change",e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const msg=$("msg"); msg.className="msg"; msg.textContent="読み込み中…";
+    const reader=new FileReader();
+    const isCsv=/\.csv$/i.test(f.name);
+    reader.onload=ev=>{
+      try{
+        let wb;
+        if(isCsv){
+          const buf=new Uint8Array(ev.target.result);
+          let text;
+          try{text=new TextDecoder("utf-8",{fatal:true}).decode(buf)}
+          catch(_){text=new TextDecoder("shift_jis").decode(buf)} // Excel保存のCSV(Shift_JIS)対策
+          wb=XLSX.read(text.replace(/^﻿/,""),{type:"string"});
+        }else{
+          wb=XLSX.read(ev.target.result,{type:"array"});
+        }
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""});
+        const q=parseRows(rows);
+        const c=Object.keys(q).length;
+        if(!c){msg.className="msg err";msg.textContent="質問が見つかりませんでした。A列に番号、B列に質問を入れてください。";return}
+        questions=q; used=[]; source=f.name+"（"+c+"問）";
+        buildStrip(remaining()); $("qLabel").textContent="質問";
+        const p=$("qText"); p.classList.add("empty"); p.textContent="「スタート」を押すと、出た番号の質問がここに表示されます。";
+        msg.textContent=c+"問を読み込みました。"; save(); render();
+      }catch(err){msg.className="msg err";msg.textContent="ファイルを読めませんでした（"+err.message+"）。";}
+      e.target.value="";
+    };
+    reader.readAsArrayBuffer(f);
+  });
+
+  function resetUI(){
+    $("resetArea").innerHTML='<button id="resetBtn" class="ghost" type="button">最初からやり直す</button>';
+    $("resetBtn").onclick=askReset;
+  }
+  function askReset(){
+    $("resetArea").innerHTML='<span class="confirm">引いた番号をすべて戻しますか？ <button class="danger" id="yes" type="button">戻す</button><button class="ghost" id="no" type="button">やめる</button></span>';
+    $("yes").onclick=()=>{used=[];buildStrip(remaining());$("qLabel").textContent="質問";
+      const p=$("qText");p.classList.add("empty");p.textContent="「スタート」を押すと、出た番号の質問がここに表示されます。";
+      save();render();resetUI();};
+    $("no").onclick=resetUI;
+  }
+  $("resetBtn").onclick=askReset;
+  $("spinBtn").onclick=spin;
+  function showB(n){$("boardQ").hidden=false;$("bLabel").textContent="No. "+n;$("bText").textContent=questions[n]||"（質問が空です）";}
+  $("board").addEventListener("click",e=>{const c=e.target.closest(".cell.used");if(c)showB(+c.dataset.n)});
+  $("board").addEventListener("keydown",e=>{if(e.key==="Enter"){const c=e.target.closest(".cell.used");if(c)showB(+c.dataset.n)}});
+  /* 画面切り替え */
+  function route(){
+    let v=(location.hash||"#slot").slice(1); if(!["slot","board","file"].includes(v)) v="slot";
+    if(mode!=="idle" && v!=="slot"){ location.hash="#slot"; return; }
+    ["slot","board","file"].forEach(k=>$("view-"+k).hidden=k!==v);
+    document.querySelectorAll(".tabs a").forEach(a=>a.classList.toggle("on",a.dataset.v===v));
+    if(v==="slot" && mode==="idle") buildStrip(remaining(), used.length?used[used.length-1]:null);
+    if(v==="board") $("boardQ").hidden=true;
+  }
+  addEventListener("hashchange",route);
+
+  load(); render(); route(); buildStrip(remaining(), used.length?used[used.length-1]:null);
+
+  /* 公開先の questions.csv を読み込む（全員共通の質問） */
+  (async function loadRemote(){
+    try{
+      const res=await fetch("questions.csv?t="+Date.now(),{cache:"no-store"});
+      if(!res.ok) return;
+      const buf=new Uint8Array(await res.arrayBuffer());
+      let text;
+      try{text=new TextDecoder("utf-8",{fatal:true}).decode(buf)}
+      catch(_){text=new TextDecoder("shift_jis").decode(buf)}
+      const wb=XLSX.read(text.replace(/^﻿/,""),{type:"string"});
+      const q=parseRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""}));
+      const c=Object.keys(q).length; if(!c) return;
+      if(JSON.stringify(q)!==JSON.stringify(questions)){ questions=q; used=[]; }
+      source="questions.csv（"+c+"問）";
+      save(); render();
+      if(mode==="idle" && !$("view-slot").hidden) buildStrip(remaining(), used.length?used[used.length-1]:null);
+    }catch(e){ /* 読めないときは組み込みの質問で動く */ }
+  })();
+  addEventListener("resize",draw);
+})();
+</script>
+
+</body>
+</html>
